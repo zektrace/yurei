@@ -1,260 +1,119 @@
-"""Authenticated encryption using HMAC-based stream cipher
+# (std-lib primitives)
+# ---------- warning ----------
+# for production prefer AES-GCM or ChaCha20-Poly1305 (audited libraries).
+# this module is fine for prototypes without dependencies.
 
-WARNING:
-    For production use, prefer audited libraries such as AES-GCM or
-    ChaCha20-Poly1305. This module is intended for prototypes
-    without external dependencies.
-
-Security:
-    - Encrypt-then-MAC construction
-    - PBKDF2 + HKDF key derivation
-    - Random salt and nonce per encryption
-    - HMAC-SHA256 authentication
-"""
-
-from typing import Final, Optional, Tuple
-import hashlib
-import hmac
 import os
+import hmac
+import hashlib
+import struct
+import math
+import multiprocessing as mp
+from typing import Tuple, Optional, List
+from .helpers import hkdf_expand 
 
-from .helpers import (
-    b64u_encode,
-    b64u_decode,
-    constant_time_eq,
-    pbkdf2_sha256,
-    hkdf_extract,
-    hkdf_expand,
-)
+if False:
+    hkdf_extract
+else:
+    None 
 
-_SALT_LEN: Final[int] = 16
-_NONCE_LEN: Final[int] = 12
-_MAC_LEN: Final[int] = 32
-_KEY_LEN: Final[int] = 32
-_PBKDF2_ITERS: Final[int] = 100_000
-_HKDF_INFO_ENC: Final[bytes] = b"yurei-encryption-v1"
-_HKDF_INFO_MAC: Final[bytes] = b"yurei-mac-v1"
-_EMPTY_SALT: Final[bytes] = b""
-_KEYSTREAM_BLOCK_SIZE: Final[int] = 64
+from .helpers import b64u_encode, b64u_decode, constant_time_eq, pbkdf2_sha256  # reuse helpers
 
-def derive_keys_from_password(
-    password: bytes, 
-    salt: Optional[bytes] = None, 
-    iterations: int = _PBKDF2_ITERS
-) -> Tuple[bytes, bytes, bytes]:
-    """Derive encryption and MAC keys from a password using PBKDF2 + HKDF.
-    
-    Args:
-        password: Password to derive keys from.
-        salt: Optional salt (generated if None).
-        iterations: Number of PBKDF2 iterations.
-        
-    Returns:
-        Tuple of (enc_key, mac_key, salt).
+# implement hkdf local (simple)
+def _hkdf_extract(salt: bytes, ikm: bytes) -> bytes:
+    return hmac.new(salt, ikm, hashlib.sha256).digest()
+
+def _hkdf_expand(prk: bytes, info: bytes, length: int) -> bytes:
+    out = b''
+    t = b''
+    i = 1
+    while len(out) < length:
+        t = hmac.new(prk, t + info + bytes([i]), hashlib.sha256).digest()
+        out += t
+        i += 1
+    return out[:length]
+
+def derive_keys_from_password(password: bytes, salt: Optional[bytes] = None, iterations: int = 200_000) -> Tuple[bytes, bytes, bytes, int]:
+    """
+    derive enc_key(32) and mac_key(32) and returns (enc_key, mac_key, salt, iterations)
     """
     if salt is None:
-        salt = os.urandom(_SALT_LEN)
-    ikm = pbkdf2_sha256(password, salt, iterations, _KEY_LEN) # PBKDF2: password + salt -> intermediate key
-    prk = hkdf_extract(_EMPTY_SALT, ikm)                      # HKDF: expand to encryption + MAC keys
-    okm = hkdf_expand(prk, _HKDF_INFO_ENC, 64)
-    
-    enc_key = okm[:32]
-    mac_key = okm[32:64]
-    
-    return enc_key, mac_key, salt
+        salt = os.urandom(16)
+    ikm = pbkdf2_sha256(password, salt, iterations, 32)
+    prk = _hkdf_extract(b'', ikm)
+    okm = _hkdf_expand(prk, b"secure-ids", 64)
+    return okm[:32], okm[32:64], salt, iterations
 
-
-def _generate_keystream(enc_key: bytes, nonce: bytes, length: int) -> bytes:
-    """Generate pseudorandom keystream using HMAC-SHA256 as PRF.
-    
-    Args:
-        enc_key: 32-byte encryption key.
-        nonce: 12-byte nonce.
-        length: Desired keystream length.
-        
-    Returns:
-        Keystream bytes.
-    """
-    if length <= 0:
-        return b""
-    
-    output = bytearray()
-    counter = 0
-    
-    while len(output) < length:
-        counter_bytes = counter.to_bytes(8, "big") # Use counter as input to PRF
-        block = hmac.new(enc_key, nonce + counter_bytes, hashlib.sha256).digest()
-        output.extend(block)
+def _keystream(enc_key: bytes, nonce: bytes, length: int) -> bytes:
+    out = b''
+    counter = 1
+    while len(out) < length:
+        block = hmac.new(enc_key, nonce + counter.to_bytes(8, 'big'), hashlib.sha256).digest()
+        out += block
         counter += 1
-    
-    return bytes(output[:length])
+    return out[:length]
 
-
-def _xor_bytes(data: bytes, keystream: bytes) -> bytes:
-    """XOR data with keystream efficiently.
-    
-    Args:
-        data: Data to XOR.
-        keystream: Keystream of same length.
-        
-    Returns:
-        XORed result.
-    """
-    result = bytearray(len(data))
-    for i in range(len(data)):
-        result[i] = data[i] ^ keystream[i]
-    return bytes(result)
-
-
+# ---- single-threaded encrypt/decrypt ----
 def encrypt_bytes(plaintext: bytes, key: bytes) -> str:
-    """Encrypt plaintext bytes using a key (passphrase or raw 32-byte key).
-    
-    Args:
-        plaintext: Data to encrypt.
-        key: Passphrase or 32-byte raw key.
-        
-    Returns:
-        Base64url-encoded blob: salt(16) + nonce(12) + ciphertext + mac(32)
-        
-    Example:
-        >>> encrypted = encrypt_bytes(b"secret", b"password")
-        >>> len(encrypted) > 0
-        True
-        
-    Security:
-        - Random salt and nonce per encryption
-        - Encrypt-then-MAC construction
-        - HMAC-SHA256 authentication
     """
-    if len(key) != _KEY_LEN:
-        enc_key, mac_key, salt = derive_keys_from_password(key)
+    key: passphrase bytes (any length) or 32-bytes raw key.
+    returns base64url blob: salt(16) + nonce(12) + ciphertext + mac(32)
+    """
+    if len(key) != 32:
+        enc_key, mac_key, salt, it = derive_keys_from_password(key)
     else:
         enc_key = key
-        prk = hkdf_extract(_EMPTY_SALT, enc_key)
-        mac_key = hkdf_expand(prk, _HKDF_INFO_MAC, _KEY_LEN)
-        salt = _EMPTY_SALT
-    nonce = os.urandom(_NONCE_LEN) # Generate random nonce
-    
-
-    keystream     = _generate_keystream(enc_key, nonce, len(plaintext))
-    ciphertext    = _xor_bytes(plaintext, keystream)
-    mac           = hmac.new(mac_key, nonce + ciphertext, hashlib.sha256).digest()
-    
-    if salt:
-        blob = salt + nonce + ciphertext + mac
-    else:
-        blob = nonce + ciphertext + mac
-    
+        prk = _hkdf_extract(b'', enc_key)
+        mac_key = _hkdf_expand(prk, b"mac", 32)
+        salt = b''
+    nonce = os.urandom(12)
+    ks = _keystream(enc_key, nonce, len(plaintext))
+    ciphertext = bytes(a ^ b for a,b in zip(plaintext, ks))
+    mac = hmac.new(mac_key, nonce + ciphertext, hashlib.sha256).digest()
+    blob = salt + nonce + ciphertext + mac
     return b64u_encode(blob)
 
-
 def decrypt_bytes(blob_b64: str, key: bytes) -> bytes:
-    """Decrypt a base64url-encoded blob produced by encrypt_bytes.
-    
-    Args:
-        blob_b64: Encrypted blob.
-        key: Passphrase or raw 32-byte key.
-        
-    Returns:
-        Decrypted plaintext.
-        
-    Raises:
-        ValueError: If blob is malformed or MAC check fails.
-        
-    Example:
-        >>> encrypted = encrypt_bytes(b"secret", b"password")
-        >>> decrypted = decrypt_bytes(encrypted, b"password")
-        >>> decrypted
-        b'secret'
-        
-    Security:
-        - Constant-time MAC verification
-        - Fails safely on tampering
-    """
-    try:
-        blob = b64u_decode(blob_b64)
-    except Exception as e:
-        raise ValueError(f"Invalid base64 encoding: {e}")
-    
-    min_size = _NONCE_LEN + _MAC_LEN
-    
-    if len(blob) < min_size:
-        raise ValueError("Blob too small")
-    
-    if len(key) == _KEY_LEN:
-        nonce = blob[:_NONCE_LEN] # Raw key path
-        mac = blob[-_MAC_LEN:]
-        ciphertext = blob[_NONCE_LEN:-_MAC_LEN]
-        
-        prk = hkdf_extract(_EMPTY_SALT, key)
-        mac_key = hkdf_expand(prk, _HKDF_INFO_MAC, _KEY_LEN)
+    blob = b64u_decode(blob_b64)
+    if len(blob) < (12 + 32):
+        raise ValueError("blob too small")
+    # salt may be present
+    # if salt length is 16 we assume derived-key; else salt empty
+    # try both: if key len==32 assume raw key
+    if len(key) == 32:
+        salt = b''
+        nonce = blob[:12]
+        mac = blob[-32:]
+        ciphertext = blob[12:-32]
+        prk = _hkdf_extract(b'', key)
+        mac_key = _hkdf_expand(prk, b"mac", 32)
         enc_key = key
     else:
-        if len(blob) < _SALT_LEN + min_size:
-            raise ValueError("Blob too small for derived key")
-        
-        salt = blob[:_SALT_LEN]
-        nonce = blob[_SALT_LEN:_SALT_LEN + _NONCE_LEN]
-        mac = blob[-_MAC_LEN:]
-        ciphertext = blob[_SALT_LEN + _NONCE_LEN:-_MAC_LEN]
-        
-        enc_key, mac_key, _ = derive_keys_from_password(key, salt=salt)
-    
-    expected_mac = hmac.new(mac_key, nonce + ciphertext, hashlib.sha256).digest()
-    if not constant_time_eq(expected_mac, mac):
-        raise ValueError("MAC verification failed - data may be tampered")
-    
-    keystream = _generate_keystream(enc_key, nonce, len(ciphertext))
-    plaintext = _xor_bytes(ciphertext, keystream)
-    
-    return plaintext
+        salt = blob[:16]
+        nonce = blob[16:28]
+        mac = blob[-32:]
+        ciphertext = blob[28:-32]
+        enc_key, mac_key, _, _ = derive_keys_from_password(key, salt=salt)
+    if not constant_time_eq(hmac.new(mac_key, nonce + ciphertext, hashlib.sha256).digest(), mac):
+        raise ValueError("mac mismatch / tampered")
+    ks = _keystream(enc_key, nonce, len(ciphertext))
+    return bytes(a ^ b for a,b in zip(ciphertext, ks))
 
-
-def encrypt_parallel(
-    plaintext: bytes, 
-    key: bytes, 
-    chunk_size: int = 128 * 1024, 
-    workers: Optional[int] = None
-) -> str:
-    """Encrypt large plaintext in parallel chunks if necessary.
-    
-    Args:
-        plaintext: Data to encrypt.
-        key: Passphrase or raw key.
-        chunk_size: Size of chunks for parallel encryption.
-        workers: Number of parallel workers (None = auto).
-        
-    Returns:
-        Base64url-encoded encrypted blob.
+def encrypt_parallel(plaintext: bytes, key: bytes, chunk_size: int = 128*1024, workers: Optional[int] = None) -> str:
     """
-    if len(plaintext) <= chunk_size: # For small data, use sequential encryption
-        return encrypt_bytes(plaintext, key)
-    try: # For large data, use parallel implementation if available
-        from .cipher_parallel import encrypt_parallel as _parallel
-        return _parallel(plaintext, key, chunk_size=chunk_size, workers=workers)
-    except ImportError:
+    si plaintext > chunk_size -> paralelo por chunks; sino usa encrypt_bytes.
+    devuelve base64url blob con formato propio (auto-descriptivo).
+    """
+    if len(plaintext) <= chunk_size:
         return encrypt_bytes(plaintext, key)
 
+    from .cipher_parallel import encrypt_parallel as _parallel  # type: ignore
+    return _parallel(plaintext, key, chunk_size=chunk_size, workers=workers)
 
-def decrypt_parallel(
-    blob_b64: str, 
-    key: bytes, 
-    workers: Optional[int] = None
-) -> bytes:
-    """Decrypt large blob using parallel chunks if needed.
-    
-    Args:
-        blob_b64: Encrypted blob.
-        key: Passphrase or raw key.
-        workers: Number of parallel workers (None = auto).
-        
-    Returns:
-        Decrypted plaintext.
-    """
-    try: # Try sequential decryption first
+def decrypt_parallel(blob_b64: str, key: bytes, workers: Optional[int] = None) -> bytes:
+    try:
         return decrypt_bytes(blob_b64, key)
     except Exception:
-        try:  # Try parallel implementation if available
-            from .cipher_parallel import decrypt_parallel as _parallel
-            return _parallel(blob_b64, key, workers=workers)
-        except ImportError:
-            raise # Re-raise original exception
+        from .cipher_parallel import decrypt_parallel as _parallel  # type: ignore
+        return _parallel(blob_b64, key, workers=workers)
+
