@@ -1,9 +1,5 @@
 <div align="center">
-<!--
-<h1 align="center">
-$${\color{#9b87f5}y}{\color{#8b7ae5}u}{\color{#7b6dd5}r}{\color{#6b60c5}e}{\color{#5b53b5}i}$$
-</h1>
--->
+
 <a href="https://github.com/ogkae/yurei/fork"><img width="460" height="353" alt="banner" src="https://github.com/user-attachments/assets/5dc7c238-f972-4d0e-887a-78eff2492356"/></a> 
 
 |[![Version](https://img.shields.io/badge/version-1.4.1-9b87f5?style=for-the-badge&logo=python)](https://github.com/ogkae/yurei) [![Python](https://img.shields.io/badge/python-3.10+-9b87f5?style=for-the-badge&logo=python)](https://www.python.org) [![License](https://img.shields.io/badge/license-MIT-9b87f5?style=for-the-badge)](./LICENSE) [![Stars](https://img.shields.io/github/stars/ogkae/yurei?style=for-the-badge&color=9b87f5)](https://github.com/ogkae/yurei/stargazers) |
@@ -12,10 +8,6 @@ $${\color{#9b87f5}y}{\color{#8b7ae5}u}{\color{#7b6dd5}r}{\color{#6b60c5}e}{\colo
 *Lightweight cryptographic primitives for modern Python applications.*
 
 </div>
-
-<!-- > [!TIP]  
-> This project has been replaced by "*segur*", a new stable and long-range project. [*Check it out now!*](https://github.com/zektrace/segur) 
--->
 
 ---
 
@@ -35,7 +27,6 @@ $${\color{#9b87f5}y}{\color{#8b7ae5}u}{\color{#7b6dd5}r}{\color{#6b60c5}e}{\colo
   - [`obfusc` - XOR Obfuscation](#obfusc---xor-obfuscation)
 - [Security Considerations](#security-considerations)
 - [Contributing](#contributing)
-<!-- - [Licence](#licence) (already exist)-->
 ---
 
 ## Overview
@@ -803,5 +794,3 @@ mypy yurei/
 |:----:|
 
 </div>
-<!-- (Also distributed under the [Toaster Licence 2025](./TOASTER-LICENSE))  || 10/10/2025 - 24/12/2025 -->
-
