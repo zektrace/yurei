@@ -3,7 +3,7 @@
     <img width="480" alt="yurei banner" src="https://github.com/user-attachments/assets/5dc7c238-f972-4d0e-887a-78eff2492356" />
   </a>
 
-  <h4><code>dependency‑free cryptographic utilities for practical tooling.</code></h4>
+  <code>dependency‑free cryptographic utilities for practical tooling.</code>
 
   [![Version](https://img.shields.io/badge/version-1.4.1-9b87f5?style=flat-square&logo=python&logoColor=white)](https://github.com/ogkae/yurei)
   [![Python](https://img.shields.io/badge/python-3.10+-9b87f5?style=flat-square&logo=python&logoColor=white)](https://www.python.org)
@@ -90,12 +90,12 @@ assert decrypt_bytes(blob, b"key") == b"data"
 <table>
 <tr>
 <td align="center">
-  <a href="https://isocpp.org"><img src="https://img.shields.io/badge/C++-000000?style=flat-square&logo=cplusplus&logoColor=white" /></a>
-  <a href="https://rust-lang.org"><img src="https://img.shields.io/badge/Rust-000000?style=flat-square&logo=rust&logoColor=white" /></a>
-  <a href="https://go.dev"><img src="https://img.shields.io/badge/Go-000000?style=flat-square&logo=go&logoColor=white" /></a>
-  <a href="https://python.org"><img src="https://img.shields.io/badge/Python-000000?style=flat-square&logo=python&logoColor=white" /></a>
-  <a href="https://typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-000000?style=flat-square&logo=typescript&logoColor=white" /></a>
-  <a href="https://julialang.org"><img src="https://img.shields.io/badge/Julia-000000?style=flat-square&logo=julia&logoColor=white" /></a>
+  <a href="https://isocpp.org"><img src="https://img.shields.io/badge/%20-000000?style=flat-square&logo=cplusplus&logoColor=white" /></a>
+  <a href="https://rust-lang.org"><img src="https://img.shields.io/badge/%20-000000?style=flat-square&logo=rust&logoColor=white" /></a>
+  <a href="https://go.dev"><img src="https://img.shields.io/badge/%20-000000?style=flat-square&logo=go&logoColor=white" /></a>
+  <a href="https://python.org"><img src="https://img.shields.io/badge/%20-000000?style=flat-square&logo=python&logoColor=white" /></a>
+  <a href="https://typescriptlang.org"><img src="https://img.shields.io/badge/%20-000000?style=flat-square&logo=typescript&logoColor=white" /></a>
+  <a href="https://julialang.org"><img src="https://img.shields.io/badge/%20-000000?style=flat-square&logo=julia&logoColor=white" /></a>
 </td>
 <td align="center">
   <a href="mailto:stehpenderdealer@proton.me"><code>stehpenderdealer@proton.me</code></a>
