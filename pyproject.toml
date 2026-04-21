@@ -1,21 +1,75 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
-
-name = 'yurei'
-version = '1.4.1'
-description = 'Python toolkit for encryption, authentication, secure IDs, and lightweight storage.'
+name = "yurei"
+version = "1.4.1"
+description = "Dependency‑free cryptographic utilities for internal tooling: encryption, authentication, secure IDs, and lightweight key‑value storage."
+readme = "README.md"
+license = { text = "MIT" }
 authors = [
-  { name = 'Zek', email = 'carloslurqui@gmail.com' },
+    { name = "zektrace", email = "stehpenderdealer@proton.me" }
 ]
-readme = 'README.md'
-requires-python = '>=3.10'
-license = 'MIT'
-keywords = ['security', 'encryption', 'hashing', 'UUID', 'tokens', 'obfuscation']
+maintainers = [
+    { name = "zektrace", email = "stehpenderdealer@proton.me" }
+]
+requires-python = ">=3.10"
+dependencies = []   # standard library only, no external dependencies
+keywords = [
+    "security",
+    "cryptography",
+    "encryption",
+    "hashing",
+    "uuid",
+    "tokens",
+    "session",
+    "obfuscation",
+    "key-value-store",
+    "stdlib-only"
+]
 classifiers = [
-  'Programming Language :: Python :: 3',
-  'Operating System :: OS Independent',
-  'Topic :: Security :: Cryptography',
-  'Topic :: Software Development :: Libraries',
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Security",
+    "Topic :: Security :: Cryptography",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
 ]
 
+[project.urls]
+Homepage = "https://github.com/zektrace/yurei"
+Repository = "https://github.com/zektrace/yurei.git"
+Issues = "https://github.com/ogkae/zektrace/issues"
+Documentation = "https://github.com/zektrace/yurei#readme"
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "ruff",
+]
 
+[tool.setuptools]
+packages = ["yurei"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+yurei = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers"
+testpaths = ["tests"]
