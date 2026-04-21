@@ -82,9 +82,12 @@ assert decrypt_bytes(blob, b"key") == b"data"
 
 ### zektrace
 
+<a align="center">
+  
 ```
 << 匿名性の最大の利点は、あなたが匿名であることだ >>
 ```
+</a>
 
 <br />
 
